@@ -3,13 +3,20 @@ import {
   createAutocomplete,
 } from '@algolia/autocomplete-core';
 import type { SearchResponse } from '@algolia/client-search';
+
+import type { Hit as HitType } from '@algolia/client-search';
+
 import React from 'react';
+
+import { Hit } from "./Hit";
+
+import { DocSearchHitSnippetResult } from "./types/DocSearchHit";
 
 import { MAX_QUERY_SIZE } from './constants';
 import type { DocSearchProps } from './DocSearch';
 import type { FooterTranslations } from './Footer';
 import { Footer } from './Footer';
-import { Hit } from './Hit';
+
 import type { ScreenStateTranslations } from './ScreenState';
 import { ScreenState } from './ScreenState';
 import type { SearchBoxTranslations } from './SearchBox';
@@ -32,6 +39,9 @@ import {
   isModifierEvent,
 } from './utils';
 
+import { ChunkApiFactory, Configuration } from "@devflowinc/trieve-js-ts-client";
+import docsearch from '../../docsearch-js/src';
+
 export type ModalTranslations = Partial<{
   searchBox: SearchBoxTranslations;
   footer: FooterTranslations;
@@ -45,9 +55,11 @@ export type DocSearchModalProps = DocSearchProps & {
 };
 
 export function DocSearchModal({
-  appId,
+  trieve_config,
+  trieve_dataset,
+  /*appId,
   apiKey,
-  indexName,
+  indexName,*/
   placeholder = 'Search docs',
   searchParameters,
   maxResultsPerGroup,
@@ -81,6 +93,9 @@ export function DocSearchModal({
     status: 'idle',
   });
 
+  const indexName = trieve_dataset;
+
+
   const containerRef = React.useRef<HTMLDivElement | null>(null);
   const modalRef = React.useRef<HTMLDivElement | null>(null);
   const formElementRef = React.useRef<HTMLDivElement | null>(null);
@@ -96,7 +111,11 @@ export function DocSearchModal({
     initialQueryFromProp || initialQueryFromSelection
   ).current;
 
-  const searchClient = useSearchClient(appId, apiKey, transformSearchClient);
+  //const searchClient = useSearchClient(appId, apiKey, transformSearchClient);
+
+  const config = new Configuration(trieve_config);
+  const chunk_client = ChunkApiFactory(config);
+
   const favoriteSearches = React.useRef(
     createStoredSearches<StoredDocSearchHit>({
       key: `__DOCSEARCH_FAVORITE_SEARCHES__${indexName}`,
@@ -223,7 +242,16 @@ export function DocSearchModal({
 
           const insightsActive = Boolean(insights);
 
-          return searchClient
+          console.log(query);
+
+          return chunk_client.searchChunk(trieve_dataset, {
+            "search_type": "hybrid", 
+            "query": query,
+            "use_weights": true,
+            }
+          )
+
+          /*return searchClient 
             .search<DocSearchHit>([
               {
                 query,
@@ -258,7 +286,7 @@ export function DocSearchModal({
                   ...searchParameters,
                 },
               },
-            ])
+            ])*/
             .catch((error) => {
               // The Algolia `RetryError` happens when all the servers have
               // failed, meaning that there's no chance the response comes
@@ -270,7 +298,145 @@ export function DocSearchModal({
 
               throw error;
             })
-            .then(({ results }) => {
+            .then(response => {
+              const results: SearchResponse<DocSearchHit> = {
+                page: 0,
+                hits: [],
+                nbHits: response.data.score_chunks.length,
+                nbPages: response.data.total_chunk_pages,
+                hitsPerPage: 0,
+                processingTimeMS: 0,
+                exhaustiveNbHits: false,
+                query: query,
+                params: "hybrid"
+              };
+
+              for (const chunk of response.data.score_chunks) {
+                for (const subchunk of chunk.metadata) {
+
+                  /*const snippetResult: DocSearchHitSnippetResult = {
+                    
+                      content: {
+                        value: "",
+                        matchLevel: 'none',
+                      },
+                      hierarchy: {
+                        lvl0: {
+                          value: "",
+                          matchLevel: 'none',
+                          matchedWords: [""],
+                        },
+                        lvl1: {
+                          value: "",
+                          matchLevel: 'none',
+                          matchedWords: [""]
+                        },
+                        lvl2: {
+                          value: "",
+                          matchLevel: 'none',
+                          matchedWords: [""]
+                        },
+                        lvl3: {
+                          value: "",
+                          matchLevel: 'none',
+                          matchedWords: [""]
+                        },
+                        lvl4: {
+                          value: "",
+                          matchLevel: 'none',
+                          matchedWords: [""]
+                        },
+                        lvl5: {
+                          value: "",
+                          matchLevel: 'none',
+                          matchedWords: [""]
+                        },
+                        lvl6: {
+                          value: "",
+                          matchLevel: 'none',
+                          matchedWords: [""]
+                        }
+                      },
+                      hierarchy_camel: [],
+                    
+                  };*/
+
+                  const hit: HitType<DocSearchHit> = {
+                    objectID: subchunk.id,
+                    content: subchunk.content ?? "<no content>",
+                    url: subchunk.link ?? "no url",
+                    url_without_anchor: subchunk.link ?? "no url",
+                    type: "content", 
+                    anchor: "",
+                    hierarchy: {
+                      lvl0: subchunk.metadata.title,
+                      lvl1: "",
+                      lvl2: null,
+                      lvl3: null,
+                      lvl4: null,
+                      lvl5: null,
+                      lvl6: null,
+                    },
+                    
+                    /*_highlightResult: {
+                      content: {
+                        value: "",
+                        matchLevel: 'none',
+                        matchedWords: [""]
+                      },
+                      hierarchy: {
+                        lvl0: {
+                          value: "",
+                          matchLevel: 'none',
+                          matchedWords: [""]
+                        },
+                        lvl1: {
+                          value: "",
+                          matchLevel: 'none',
+                          matchedWords: [""]
+                        },
+                        lvl2: {
+                          value: "",
+                          matchLevel: 'none',
+                          matchedWords: [""]
+                        },
+                        lvl3: {
+                          value: "",
+                          matchLevel: 'none',
+                          matchedWords: [""]
+                        },
+                        lvl4: {
+                          value: "",
+                          matchLevel: 'none',
+                          matchedWords: [""]
+                        },
+                        lvl5: {
+                          value: "",
+                          matchLevel: 'none',
+                          matchedWords: [""]
+                        },
+                        lvl6: {
+                          value: "",
+                          matchLevel: 'none',
+                          matchedWords: [""]
+                        }
+                      },
+                      hierarchy_camel: [],
+                    },*/
+                    _highlightResult: null as unknown as any,
+                    _snippetResult: null as unknown as any,
+                  };
+                  (hit as unknown as any).hierarchy_camel = [];
+                  hit._highlightResult = hit as unknown as any;
+                  hit._snippetResult = hit as unknown as any;
+                  
+
+                  results.hits.push(hit);
+                }
+              }
+
+              return { results: [results]};
+            }).then(({ results }) => {
               const firstResult = results[0] as SearchResponse<DocSearchHit>;
               const { hits, nbHits } = firstResult;
               const sources = groupBy<DocSearchHit>(
@@ -294,7 +460,7 @@ export function DocSearchModal({
 
               let insightsParams = {};
 
-              if (insightsActive) {
+              /*if (insightsActive) {
                 insightsParams = {
                   __autocomplete_indexName: indexName,
                   __autocomplete_queryID: firstResult.queryID,
@@ -303,7 +469,7 @@ export function DocSearchModal({
                     apiKey,
                   },
                 };
-              }
+              }*/
 
               return Object.values<DocSearchHit[]>(sources).map(
                 (items, index) => {
@@ -362,7 +528,7 @@ export function DocSearchModal({
       indexName,
       searchParameters,
       maxResultsPerGroup,
-      searchClient,
+      //searchClient,
       onClose,
       recentSearches,
       favoriteSearches,
@@ -373,8 +539,7 @@ export function DocSearchModal({
       transformItems,
       disableUserPersonalization,
       insights,
-      appId,
-      apiKey,
+      trieve_config,
     ]
   );
 

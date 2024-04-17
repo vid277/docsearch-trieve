@@ -18,15 +18,19 @@ import { useDocSearchKeyboardEvents } from './useDocSearchKeyboardEvents';
 
 import type { ButtonTranslations, ModalTranslations } from '.';
 
+import { ConfigurationParameters } from "@devflowinc/trieve-js-ts-client";
+
 export type DocSearchTranslations = Partial<{
   button: ButtonTranslations;
   modal: ModalTranslations;
 }>;
 
 export interface DocSearchProps {
-  appId: string;
+  trieve_config: ConfigurationParameters;
+  trieve_dataset: string;
+  /*appId: string;
   apiKey: string;
-  indexName: string;
+  indexName: string;*/
   placeholder?: string;
   searchParameters?: SearchOptions;
   maxResultsPerGroup?: number;
